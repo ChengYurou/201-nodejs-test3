@@ -1,14 +1,15 @@
+const Category = require('../model/category');
 const Item = require('../model/item');
 const async = require('async');
 
-class ItemController {
+class CategoryController {
   getAll(req, res, next) {
     async.series({
       items: (done) => {
-        Item.find({}, done)
+        Category.find({}, done)
       },
       totalCount: (done) => {
-        Item.count(done)
+        Category.count(done)
       }
     }, (err, docs) => {
       if (err) {
@@ -19,7 +20,7 @@ class ItemController {
   }
 
   getOne(req, res, next) {
-    Item.findById(req.params.itemId, (err, doc) => {
+    Category.findById(req.params.categoryId, (err, doc) => {
       if (!doc) {
         return res.sendStatus(404);
       }
@@ -31,17 +32,33 @@ class ItemController {
   }
 
   create(req, res, next) {
-    Item.create(req.body, (err, doc) => {
+    Category.create(req.body, (err, doc) => {
       if (err) {
         return next(err);
       }
-      return res.status(201).send({uri: `items/${doc._id}`});
+      return res.status(201).send({uri: `categories/${doc._id}`});
     })
   }
 
   delete(req, res, next) {
-    Item.findByIdAndRemove(req.params.itemId, (err, doc) => {
-      if(!doc) {
+    const categoryId = req.params.categoryId
+    async.waterfall([
+      (done) => {
+        Category.findByIdAndRemove(categoryId, done)
+      },
+      (doc, done) => {
+        if (!doc) {
+          return done({status: 404}, null);
+        }
+        Item.find({category: categoryId}, done)
+      }, (docs, done) => {
+        async.map(docs, (item, callback) => {
+          Item.remove(item, callback);
+        }, done)
+      },
+
+    ], (err) => {
+      if(err && err.status){
         return res.sendStatus(404)
       }
       if (err) {
@@ -52,8 +69,8 @@ class ItemController {
   }
 
   update(req, res, next) {
-    Item.findByIdAndUpdate(req.params.itemId, req.body, (err, doc) => {
-      if(!doc) {
+    Category.findByIdAndUpdate(req.params.categoryId, req.body, (err, doc) => {
+      if (!doc) {
         return res.sendStatus(404)
       }
       if (err) {
@@ -64,4 +81,4 @@ class ItemController {
   }
 }
 
-module.exports = ItemController;
+module.exports = CategoryController;
